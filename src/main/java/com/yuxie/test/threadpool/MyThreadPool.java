@@ -18,7 +18,8 @@ public class MyThreadPool extends ThreadPoolExecutor {
     }
 
     private MyThreadPool() {
-        super(5, 10, 200, TimeUnit.MILLISECONDS,
+        super(5, 10, 30, TimeUnit.SECONDS,
                 new ArrayBlockingQueue<Runnable>(5));
+        this.allowCoreThreadTimeOut(true);
     }
 }
