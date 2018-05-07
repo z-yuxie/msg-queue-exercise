@@ -97,7 +97,13 @@ public class Subcriber {
                 return;
             }
             lock.lock();
-            hasPushThread = true;
+            if (!hasPushThread) {
+                hasPushThread = true;
+                lock.unlock();
+            } else {
+                lock.unlock();
+                return;
+            }
             lock.unlock();
             //这个线程是否有必要让他被创建后一直存在，然后在使用时唤醒它？
             MyThreadPool.getInstance().execute(new Runnable() {

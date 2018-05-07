@@ -134,8 +134,13 @@ public class MyQueue {
                 return;
             }
             lock.lock();
-            hasPushThread = true;
-            lock.unlock();
+            if (hasPushThread || subcriberRecord.isEmpty()) {
+                lock.unlock();
+                return;
+            } else {
+                hasPushThread = true;
+                lock.unlock();
+            }
             //这个线程是否有必要让他被创建后一直存在，然后在使用时唤醒它？
             MyThreadPool.getInstance().execute(new Runnable() {
                 @Override
