@@ -28,12 +28,12 @@ atlassian-ide-plugin.xml
 local.properties
 
 
-# SVN Ä¿Â¼
+# SVN ç›®å½•
 .svn
 _svn
 
 
-# FlexÏîÄ¿ÎÄ¼ş
+# Flexé¡¹ç›®æ–‡ä»¶
 .externalToolBuilders
 .actionScriptProperties
 .flexProperties
@@ -50,20 +50,20 @@ classes/
 
 
 
-#gradleÎÄ¼ş
+#gradleæ–‡ä»¶
 .gradle
 gradle-app.setting
 # Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
 !gradle-wrapper.jar
 
 
-# ÆäËûÎÄ¼ş
+# å…¶ä»–æ–‡ä»¶
 *.log
 *.bak
 doc/
 .sonar_lock
 
-# Æ»¹û»úÆ÷µÄÄÚ²¿¹ÜÀíÎÄ¼ş
+# è‹¹æœæœºå™¨çš„å†…éƒ¨ç®¡ç†æ–‡ä»¶
 *~
 .DS_Store
 node_modules/
