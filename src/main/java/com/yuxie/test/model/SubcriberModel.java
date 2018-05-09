@@ -18,7 +18,7 @@ public class SubcriberModel {
      * 订阅者集合,代替数据库或其他持久化方式存储的各个订阅者
      * 若业务系统对各个订阅者有做持久化处理,则此集合仅代表在系统中当前时间段处在活跃状态的订阅者集合
      */
-    private Map<String , Subcriber> subcriberSet;
+    private Map<String , Subcriber> subcriberMap;
 
     private Lock lock = new ReentrantLock();
 
@@ -31,7 +31,34 @@ public class SubcriberModel {
     }
 
     private SubcriberModel() {
-        subcriberSet = new HashMap<>();
+        subcriberMap = new HashMap<>();
+    }
+
+    /**
+     * 停止当前已注册的所有订阅者的运行,清空订阅者管理中心的订阅者目录
+     */
+    public void emptySubcriberMap() {
+        System.out.println("------------开始清空订阅者目录-----------");
+        if (subcriberMap.isEmpty()) {
+            return;
+        }
+        Map<String , Subcriber> poolClone = new HashMap<>(subcriberMap);
+        for (Map.Entry<String , Subcriber> entry : poolClone.entrySet()) {
+            if (entry == null || entry.getValue() == null) {
+                continue;
+            }
+            if (entry.getValue().shutDownDealMsgThread()) {
+                System.out.println("成功停止订阅者:" + entry.getKey() + " 的运行,可以进行删除");
+                subcriberMap.remove(entry.getKey());
+            } else {
+                System.out.println("停止订阅者:" + entry.getKey() + " 的运行失败,暂时无法进行删除");
+            }
+        }
+        if (subcriberMap.isEmpty()) {
+            System.out.println("--------------订阅者目录清空完成-------------");
+        } else {
+            System.out.println("--------------订阅者目录未完全清空--------------");
+        }
     }
 
     /**
@@ -42,12 +69,12 @@ public class SubcriberModel {
      */
     public boolean unsubscribeQueue(String subcriberName , String queueName) {
         try {
-            if (!subcriberSet.containsKey(subcriberName)) {
+            if (!subcriberMap.containsKey(subcriberName)) {
                 System.out.println("订阅者:" + subcriberName + " 不存在,无需进行退订操作!");
                 return false;
             }
             if (QueuePoolModel.getInstance().unsubscribeQueue(subcriberName, queueName)) {
-                subcriberSet.get(subcriberName).removeQueueSubcriberRecord(queueName);
+                subcriberMap.get(subcriberName).removeQueueSubcriberRecord(queueName);
                 System.out.println("订阅者:" + subcriberName + " 成功退订了一个队列:" + queueName);
                 return true;
             }
@@ -68,12 +95,12 @@ public class SubcriberModel {
      */
     public boolean subscribeQueue(String subcriberName , String queueName) {
         try {
-            if (!subcriberSet.containsKey(subcriberName)) {
+            if (!subcriberMap.containsKey(subcriberName)) {
                 System.out.println("订阅者:" + subcriberName + " 还没有进行注册,无法进行订阅!");
                 return false;
             }
             if (QueuePoolModel.getInstance().subscribeQueue(subcriberName, queueName)) {
-                subcriberSet.get(subcriberName).addQueueSubcriberRecord(queueName);
+                subcriberMap.get(subcriberName).addQueueSubcriberRecord(queueName);
                 System.out.println("订阅者:" + subcriberName + " 成功订阅了一个队列:" + queueName);
                 return true;
             }
@@ -93,17 +120,17 @@ public class SubcriberModel {
      */
     public boolean registSubcriber(String subcriberName) {
         try {
-            if (subcriberSet.containsKey(subcriberName)) {
+            if (subcriberMap.containsKey(subcriberName)) {
                 System.out.println("订阅者:" + subcriberName + " 已经注册过了,请不要重复注册!");
                 return false;
             }
             Subcriber newSubcriber = new Subcriber(subcriberName);
             lock.lock();
-            if (subcriberSet.containsKey(subcriberName)) {
+            if (subcriberMap.containsKey(subcriberName)) {
                 System.out.println("订阅者:" + subcriberName + " 已经注册过了,请不要重复注册!");
                 return false;
             }
-            subcriberSet.put(subcriberName , newSubcriber);
+            subcriberMap.put(subcriberName , newSubcriber);
             lock.unlock();
             System.out.println("成功注册了一个新的订阅者:" + subcriberName);
             return true;
@@ -122,14 +149,14 @@ public class SubcriberModel {
      */
     public boolean receiveMsg(String subcriberName , String msg) {
         try {
-            if (!subcriberSet.containsKey(subcriberName)) {
+            if (!subcriberMap.containsKey(subcriberName)) {
                 //若有持久化,此处实际应该是去数据库等获取订阅者,如果仍没有获取到,再返回false
                 //在没有获取到对应订阅者的情况下,应当通知系统中的各个队列取消该订阅者的订阅？
                 //或者抛出异常,让推送方的队列对此问题进行处理？
                 System.out.println("接收推送给:" + subcriberName + " 的消息:" + msg + "时,发现该订阅者已不存在");
                 return false;
             }
-            return subcriberSet.get(subcriberName).receiveMsg(msg);
+            return subcriberMap.get(subcriberName).receiveMsg(msg);
         } catch (Exception e) {
             System.out.println("接收推送给:" + subcriberName + " 的消息:" + msg + "时,发生异常,异常信息为:");
             e.printStackTrace();

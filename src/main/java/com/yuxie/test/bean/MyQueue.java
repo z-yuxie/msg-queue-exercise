@@ -25,25 +25,26 @@ public class MyQueue {
     /**
      * 消息队列
      */
-    private Queue<String> msgQueue;
+    private LinkedBlockingQueue<String> msgQueue;
     /**
      * 订阅者记录
      */
     private Set<String> subcriberRecord;
     /**
-     * 是否已经拥有消息推送线程
+     * 推送消息队列中的消息的线程
      */
-    private boolean hasPushThread;
+    private Thread pushMsgThread;
 
     private Lock lock = new ReentrantLock();
 
-    private Condition queueIsEmpty = lock.newCondition();
+    private Condition noSubcriberRecord = lock.newCondition();
 
     public MyQueue(String queueName) {
         this.queueName = queueName;
         this.msgQueue = new LinkedBlockingQueue<>();
         this.subcriberRecord = new HashSet<>();
-        this.hasPushThread = false;
+        this.pushMsgThread = new Thread(createPushMsgTask());
+        this.pushMsgThread.start();
     }
 
     /**
@@ -52,23 +53,20 @@ public class MyQueue {
      * @return 是否退订成功
      */
     public boolean unsubscribe(String subcriberName) {
+        lock.lock();
         try {
             if (!subcriberRecord.contains(subcriberName)) {
                 System.out.println("订阅者:" + subcriberName + " 未订阅队列:" + queueName);
                 return false;
             }
-            lock.lock();
-            if (!subcriberRecord.contains(subcriberName)) {
-                System.out.println("订阅者:" + subcriberName + " 未订阅队列:" + queueName);
-                return false;
-            }
             subcriberRecord.remove(subcriberName);
-            lock.unlock();
             return true;
         } catch (Exception e) {
             System.out.println("订阅者:" + subcriberName + " 退订队列:" + queueName + " 时发生异常,异常信息为:");
             e.printStackTrace();
             return false;
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -78,29 +76,24 @@ public class MyQueue {
      * @return 是否订阅成功
      */
     public boolean subscribe(String subcriberName) {
+        lock.lock();
         try {
             if (subcriberRecord.contains(subcriberName)) {
                 System.out.println("订阅者:" + subcriberName + " 已经订阅了队列:" + queueName);
                 return false;
             }
-            lock.lock();
-            if (subcriberRecord.contains(subcriberName)) {
-                System.out.println("订阅者:" + subcriberName + " 已经订阅了队列:" + queueName);
-                return false;
+            if (subcriberRecord.add(subcriberName)) {
+                noSubcriberRecord.signal();
+                return true;
             }
-            subcriberRecord.add(subcriberName);
-            lock.unlock();
-            if (!msgQueue.isEmpty()) {
-                System.out.println("订阅者:" + subcriberName + "新订阅队列:" + queueName
-                        + " 时发现该队列中有待推送的消息,触发消息推送");
-                pushMsgs();
-            }
-            return true;
+            System.out.println("订阅者:" + subcriberName + " 订阅队列:" + queueName + " 失败");
         } catch (Exception e) {
             System.out.println("订阅者:" + subcriberName + " 新订阅队列:" + queueName + " 时发生异常,异常信息为:");
             e.printStackTrace();
-            return false;
+        } finally {
+            lock.unlock();
         }
+        return false;
     }
 
     /**
@@ -110,64 +103,64 @@ public class MyQueue {
      */
     public boolean addMsg(String msg) {
         try {
-            boolean flag = msgQueue.offer(msg);
-            if (flag) {
+            if (msgQueue.offer(msg)) {
                 System.out.println("成功向队列:" + queueName + " 中添加了一个新消息:" + msg);
-                //添加成功,开始进行相应的处理
-                pushMsgs();
+                return true;
             }
-            return flag;
+            System.out.println("向队列:" + queueName + " 中添加新消息:" + msg + " 失败");
         } catch (Exception e) {
             System.out.println("向当前队列" + queueName + " 添加消息:" + msg + " 时发生异常,异常信息为:");
             e.printStackTrace();
+        }
+        return false;
+    }
+
+    /**
+     * 中断消息推送工作线程
+     * @return 是否已成功告知线程中断
+     */
+    public boolean shutDownPushMsgThread() {
+        try {
+            pushMsgThread.interrupt();
+            return pushMsgThread.isInterrupted() || !pushMsgThread.isAlive();
+        } catch (Exception e) {
+            System.out.println("中断队列:" + queueName + " 的消息推送线程失败");
             return false;
         }
     }
 
     /**
-     * 向该队列的订阅者们推送消息
+     * 创建消息推送任务
+     * @return 属于本队列的消息推送任务
      */
-    public void pushMsgs() {
-        try {
-            if (hasPushThread || subcriberRecord.isEmpty()) {
-                //如果该队列的推送线程正在执行,或者当前该队列的订阅者为空,则直接返回
-                return;
-            }
-            lock.lock();
-            if (hasPushThread || subcriberRecord.isEmpty()) {
-                lock.unlock();
-                return;
-            } else {
-                hasPushThread = true;
-                lock.unlock();
-            }
-            //这个线程是否有必要让他被创建后一直存在，然后在使用时唤醒它？
-            MyThreadPool.getInstance().execute(new Runnable() {
-                @Override
-                public void run() {
-                    System.out.println("消息队列:" + queueName + " 的消息推送任务开始运行");
-                    while (true) {
-                        String msg = null;
-                        //为何网上大多数代码均是先取出,然后再删除,而不是取出的同时便删除头元素？
-                        //是否需要每个消息都单开一个线程？
-                        if ((msg = msgQueue.poll()) != null) {
-                            System.out.println("消息队列:" + queueName + " 开始向其订阅者们推送消息:" + msg);
-                            pushMsgToSubcriber(msg);
-                            System.out.println("消息队列:" + queueName + " 向其订阅者们推送消息:" + msg + " 结束");
-                        } else {
+    private Runnable createPushMsgTask() {
+        return new Runnable() {
+            @Override
+            public void run() {
+                System.out.println("消息队列:" + queueName + " 的消息推送任务开始运行");
+                while (true) {
+                    String msg = null;
+                    try {
+                        msg = msgQueue.take();
+                        if (subcriberRecord.isEmpty()) {
                             lock.lock();
-                            hasPushThread = false;
+                            noSubcriberRecord.await();
                             lock.unlock();
-                            System.out.println("消息队列:" + queueName + " 的消息推送任务运行结束");
-                            return;
                         }
+                        System.out.println("消息队列:" + queueName + " 开始向其订阅者们推送消息:" + msg);
+                        pushMsgToSubcriber(msg);
+                        System.out.println("消息队列:" + queueName + " 向其订阅者们推送消息:" + msg + " 结束");
+                        msgQueue.remove(msg);
+                    } catch (InterruptedException e) {
+                        System.out.println("消息队列:" + queueName + " 的消息推送线程被中断!");
+                        return;
+                    } catch (Exception e) {
+                        System.out.println("消息队列" + queueName + " 向订阅者们推送消息时发生异常,异常信息为:");
+                        e.printStackTrace();
                     }
                 }
-            });
-        } catch (Exception e) {
-            System.out.println("消息队列:" + queueName + "推送消息时发生异常,异常信息为：");
-            e.printStackTrace();
-        }
+            }
+        };
     }
 
     /**
@@ -176,7 +169,19 @@ public class MyQueue {
      */
     private void pushMsgToSubcriber(String msg) {
         for (String subcriberName : subcriberRecord) {
-            SubcriberModel.getInstance().receiveMsg(subcriberName , msg);
+            try {
+                if (SubcriberModel.getInstance().receiveMsg(subcriberName , msg)) {
+                    System.out.println("消息队列:" + queueName + " 向订阅者" + subcriberName + " 成功推送了一条消息:" + msg);
+                    continue;
+                }
+                System.out.println("消息队列:" + queueName + " 向订阅者" + subcriberName + " 推送消息:" + msg + " 失败");
+            } catch (Exception e) {
+                System.out.println("消息队列:" + queueName + " 向订阅者" + subcriberName + " 推送消息:" + msg
+                        + " 时发生异常,异常信息为:" + e.getMessage());
+                e.printStackTrace();
+            }
+            System.out.println("消息队列:" + queueName + " 对向订阅者" + subcriberName + " 推送失败的消息:" + msg
+                    + " 进行处理......(保存后交由其他任务进行处理)");
         }
     }
 

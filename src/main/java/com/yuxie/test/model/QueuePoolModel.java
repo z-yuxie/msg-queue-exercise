@@ -1,6 +1,7 @@
 package com.yuxie.test.model;
 
 import com.yuxie.test.bean.MyQueue;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
 import java.util.concurrent.locks.Condition;
@@ -76,6 +77,33 @@ public class QueuePoolModel {
         this.queueCount = queueCount;
         this.autoCreateQueue = autoCreateQueue;
         this.queueLength = queueLength;
+    }
+
+    /**
+     * 暂停队列池中所有队列的运行,然后清空队列池
+     */
+    public void emptyQueuePool() {
+        System.out.println("------------开始清空队列池-----------");
+        if (queuePool.isEmpty()) {
+            return;
+        }
+        Map<String , MyQueue> poolClone = new HashMap<>(queuePool);
+        for (Map.Entry<String , MyQueue> entry : poolClone.entrySet()) {
+            if (entry == null || entry.getValue() == null) {
+                continue;
+            }
+            if (entry.getValue().shutDownPushMsgThread()) {
+                System.out.println("成功停止队列:" + entry.getKey() + " 的运行,可以进行删除");
+                queuePool.remove(entry.getKey());
+            } else {
+                System.out.println("停止队列:" + entry.getKey() + " 的运行失败,暂时无法进行删除");
+            }
+        }
+        if (queuePool.isEmpty()) {
+            System.out.println("--------------队列池清空完成-------------");
+        } else {
+            System.out.println("--------------队列池未完全清空--------------");
+        }
     }
 
     /**

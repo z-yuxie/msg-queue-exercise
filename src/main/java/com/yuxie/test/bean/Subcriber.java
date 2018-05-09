@@ -29,12 +29,11 @@ public class Subcriber {
     /**
      * 待处理消息队列
      */
-    private Queue<String> msgQueue;
+    private LinkedBlockingQueue<String> msgQueue;
     /**
-     * 是否已有正在执行中的消息处理线程
-     * 也可作为当前订阅者是否处在活跃状态的判断标识
+     * 处理待处理消息队列中的消息的线程
      */
-    private boolean hasPushThread;
+    private Thread dealMsgThread;
 
     private Lock lock = new ReentrantLock();
 
@@ -44,7 +43,8 @@ public class Subcriber {
         this.subcriberName = subcriberName;
         this.myQueueSet = new HashSet<>();
         this.msgQueue = new LinkedBlockingQueue<>();
-        this.hasPushThread = false;
+        this.dealMsgThread = new Thread(createDealMsgTask());
+        this.dealMsgThread.start();
     }
 
     /**
@@ -74,72 +74,65 @@ public class Subcriber {
      */
     public boolean receiveMsg(String msg) {
         try {
-            boolean flag = msgQueue.offer(msg);
-            if (flag) {
+            if (msgQueue.offer(msg)) {
                 //添加成功,开始进行相应的处理
-                dealMsgs();
+                System.out.println("订阅者:" + subcriberName + " 成功接收并保存了一个消息:" + msg);
+                return true;
             }
-            return flag;
+            System.out.println("订阅者:" + subcriberName + " 保存接收到的消息:" + msg + " 失败");
         } catch (Exception e) {
-            System.out.println("向当前订阅者" + subcriberName + " 添加待处理消息:" + msg + " 时发生异常,异常信息为:");
+            System.out.println("订阅者" + subcriberName + " 保存接收到的消息:" + msg + " 时发生异常,异常信息为:");
             e.printStackTrace();
+        }
+        return false;
+    }
+
+    /**
+     * 中断消息处理工作线程
+     * @return 是否已成功告知线程中断
+     */
+    public boolean shutDownDealMsgThread() {
+        try {
+            dealMsgThread.interrupt();
+            return dealMsgThread.isInterrupted() || !dealMsgThread.isAlive();
+        } catch (Exception e) {
+            System.out.println("中断订阅者:" + subcriberName + " 的消息处理线程失败");
             return false;
         }
     }
 
     /**
-     * 向该队列的订阅者们推送消息
+     * 创建消息处理任务
+     * @return 属于当前订阅者的消息处理任务
      */
-    private void dealMsgs() {
-        try {
-            if (hasPushThread) {
-                //如果该队列的推送线程正在执行则直接返回
-                return;
-            }
-            lock.lock();
-            if (!hasPushThread) {
-                hasPushThread = true;
-                lock.unlock();
-            } else {
-                lock.unlock();
-                return;
-            }
-            //这个线程是否有必要让他被创建后一直存在，然后在使用时唤醒它？
-            MyThreadPool.getInstance().execute(new Runnable() {
-                @Override
-                public void run() {
-                    while (true) {
-                        String msg = null;
-                        //为何网上大多数代码均是先取出,然后再删除,而不是取出的同时便删除头元素？
-                        if ((msg = msgQueue.poll()) != null) {
-                            try {
-                                System.out.println("订阅者:" + subcriberName + " 从待处理消息队列中取出一个消息:"
-                                        + msg + " 进行处理....");
-                                Thread.sleep(1000);
-                                System.out.println("订阅者:" + subcriberName + " 对消息:"
-                                        + msg + " 的处理结束");
-                            } catch (Exception e) {
-                                System.out.println("订阅者:" + subcriberName + " 处理消息:"
-                                        + msg + " 时发生异常,异常信息为:");
-                                e.printStackTrace();
-                                System.out.println("订阅者:" + subcriberName + " 对处理失败的消息:"
-                                        + msg + " 进行保存及其他操作");
-                            }
-                        } else {
-                            lock.lock();
-                            hasPushThread = false;
-                            lock.unlock();
-                            System.out.println("订阅者:" + subcriberName + " 已暂时处理完到当前为止收到的所有消息,当前时间为:"
-                                    + System.currentTimeMillis());
-                            return;
-                        }
+    private Runnable createDealMsgTask() {
+        return new Runnable() {
+            @Override
+            public void run() {
+                System.out.println("订阅者:" + subcriberName + " 的消息处理任务开始运行");
+                while (true) {
+                    String msg = null;
+                    try {
+                        msg = msgQueue.take();
+                        System.out.println("订阅者:" + subcriberName + " 从待处理消息队列中取出一个消息:"
+                                + msg + " 进行处理....");
+                        Thread.sleep(1000);
+                        System.out.println("订阅者:" + subcriberName + " 对消息:"
+                                + msg + " 的处理结束");
+                        msgQueue.remove(msg);
+                    } catch (InterruptedException e) {
+                        System.out.println("订阅者:" + subcriberName + " 的消息处理线程被中断!");
+                        return;
+                    } catch (Exception e) {
+                        System.out.println("订阅者:" + subcriberName + " 处理消息:"
+                                + msg + " 时发生异常,异常信息为:");
+                        e.printStackTrace();
+                        System.out.println("订阅者:" + subcriberName + " 对处理失败的消息:"
+                                + msg + " 进行保存及其他操作");
                     }
                 }
-            });
-        } catch (Exception e) {
-            System.out.println("推送消息时发生异常,异常信息为：");
-            e.printStackTrace();
-        }
+            }
+        };
     }
 
     @Override

@@ -29,6 +29,8 @@ public class MyTest {
                     continue;
                 }
                 if ("$close".equals(oneInstructionsKeys[0])) {
+                    QueuePoolModel.getInstance().emptyQueuePool();
+                    SubcriberModel.getInstance().emptySubcriberMap();
                     break;
                 } else if (oneInstructionsKeys.length == 2 && "$registSubcriber".equals(oneInstructionsKeys[0])
                         && StringUtils.isNotBlank(oneInstructionsKeys[1])) {

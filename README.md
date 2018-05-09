@@ -35,10 +35,10 @@ $pushMsg 发布者2 这是一条仅有一个订阅者时的即时推送消息1 �
 $subscribeQueue 订阅者2 发布者创建的队列1  
 $pushMsg 发布者2 这是一条有两个订阅者时的即时推送消息1 发布者创建的队列1  
 $subscribeQueue 订阅者2 订阅者创建的队列1  
-$pushMsg 发布者1 这是一条即时推送消息2 订阅者创建的队列1  
+$pushMsg 发布者1 这是一条即时推送消息1 订阅者创建的队列1  
 $unsubscribeQueue 订阅者2 订阅者创建的队列1  
-$pushMsg 发布者1 这是一条即时推送消息3 订阅者创建的队列1  
+$pushMsg 发布者1 这是一条即时推送消息2 订阅者创建的队列1  
 $unsubscribeQueue 订阅者2 发布者创建的队列1  
-$pushMsg 发布者1 这是一条即时推送消息4 发布者创建的队列1  
+$pushMsg 发布者1 这是一条队列中的待拉取消息4 发布者创建的队列1  
 $subscribeQueue 订阅者2 订阅者创建的队列1  
 $close
