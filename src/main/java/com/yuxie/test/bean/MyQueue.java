@@ -142,7 +142,7 @@ public class MyQueue {
                     String msg = null;
                     try {
                         msg = msgQueue.take();
-                        if (subcriberRecord.isEmpty()) {
+                        while (subcriberRecord.isEmpty()) {
                             lock.lock();
                             noSubcriberRecord.await();
                             lock.unlock();
