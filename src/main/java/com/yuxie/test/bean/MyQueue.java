@@ -1,11 +1,9 @@
 package com.yuxie.test.bean;
 
 import com.yuxie.test.model.SubcriberModel;
-import com.yuxie.test.threadpool.MyThreadPool;
 
 import java.util.HashSet;
 import java.util.Objects;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Condition;
@@ -145,7 +143,6 @@ public class MyQueue {
                         if (subcriberRecord.isEmpty()) {
                             lock.lock();
                             noSubcriberRecord.await();
-                            lock.unlock();
                         }
                         System.out.println("消息队列:" + queueName + " 开始向其订阅者们推送消息:" + msg);
                         pushMsgToSubcriber(msg);

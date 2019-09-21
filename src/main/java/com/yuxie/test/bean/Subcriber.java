@@ -1,10 +1,7 @@
 package com.yuxie.test.bean;
 
-import com.yuxie.test.threadpool.MyThreadPool;
-
 import java.util.HashSet;
 import java.util.Objects;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Condition;
@@ -14,7 +11,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * @author 147356
  * @create 2018-05-06 23:18
- * @desc 订阅者类
+ * @desc 订阅者类，此类中暂未使用codition进行线程通信控制
  **/
 public class Subcriber {
     /**

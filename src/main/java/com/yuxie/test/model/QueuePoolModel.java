@@ -1,7 +1,6 @@
 package com.yuxie.test.model;
 
 import com.yuxie.test.bean.MyQueue;
-import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
 import java.util.concurrent.locks.Condition;
@@ -139,8 +138,8 @@ public class QueuePoolModel {
                     System.out.println("订阅者" + subcriberName + " 要订阅的队列:" + queueName + " 不存在!");
                     return false;
                 }
-                MyQueue newQueue = new MyQueue(queueName);
                 lock.lock();
+                MyQueue newQueue = new MyQueue(queueName);
                 if (!queuePool.containsKey(queueName)) {
                     System.out.println("新创建了一个队列:" + queueName);
                     queuePool.put(queueName , newQueue);
@@ -169,8 +168,8 @@ public class QueuePoolModel {
                     System.out.println("发布者:" + publisherName + " :要发布到的队列:" + queueName + " 不存在!");
                     return false;
                 }
-                MyQueue newQueue = new MyQueue(queueName);
                 lock.lock();
+                MyQueue newQueue = new MyQueue(queueName);
                 if (!queuePool.containsKey(queueName)) {
                     System.out.println("新创建了一个队列:" + queueName);
                     queuePool.put(queueName , newQueue);
